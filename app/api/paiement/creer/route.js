@@ -70,7 +70,7 @@ export async function POST(request) {
 
     const montant = nuits * residence.prix_nuit;
 
-    // 5. Créer la réservation, statut "en_attente" avant paiement
+    // 5. Créer la réservation, statut "en_attente_paiement" avant paiement
     const { data: reservation, error: insertError } = await supabase
       .from("reservations")
       .insert({
@@ -83,7 +83,7 @@ export async function POST(request) {
         date_depart: dateDepart,
         message: message || null,
         montant,
-        statut: "en_attente",
+        statut: "en_attente_paiement",
         paye: false,
       })
       .select()
@@ -98,7 +98,15 @@ export async function POST(request) {
     }
 
     // 6. Initier le paiement GeniusPay
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    // On utilise l'origine réelle de la requête en priorité (fonctionne en local
+    // ET en prod sans dépendre d'une variable d'env à tenir à jour manuellement).
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+
+    // On redirige vers la page de confirmation, qui vérifie elle-même le
+    // paiement auprès de GeniusPay à l'affichage (ne dépend pas d'un webhook).
+    const successUrl = `${baseUrl}/reservation/confirmation/${reservation.id}`;
+    const errorUrl = `${baseUrl}/reserver/${residenceId}?erreur=paiement`;
+
     let paiement;
     try {
       paiement = await creerPaiementGenius({
@@ -106,8 +114,8 @@ export async function POST(request) {
         clientNom: clientRow.nom,
         clientTelephone: clientRow.telephone,
         reservationId: reservation.id,
-        successUrl: `${baseUrl}/reservations/${reservation.id}/succes`,
-        errorUrl: `${baseUrl}/reservations/${reservation.id}/echec`,
+        successUrl,
+        errorUrl,
       });
     } catch (geniusError) {
       await supabase.from("reservations").delete().eq("id", reservation.id);
@@ -127,8 +135,18 @@ export async function POST(request) {
     }
 
     // 8. Renvoyer le lien de paiement au frontend
+    // IMPORTANT : GeniusPay renvoie le champ "checkout_url", pas "payment_link".
+    if (!paiement?.checkout_url) {
+      console.error("Réponse GeniusPay sans checkout_url :", paiement);
+      await supabase.from("reservations").delete().eq("id", reservation.id);
+      return NextResponse.json(
+        { message: "Lien de paiement introuvable dans la réponse GeniusPay." },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({
-      paymentLink: paiement?.payment_link || paiement?.paymentLink,
+      paymentLink: paiement.checkout_url,
       reservationId: reservation.id,
     });
   } catch (err) {
