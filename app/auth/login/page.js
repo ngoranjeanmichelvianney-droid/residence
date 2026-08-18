@@ -1,0 +1,147 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import Header from "@/components/Header";
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [chargement, setChargement] = useState(false);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setErreur("");
+    setChargement(true);
+
+    const supabase = createClient();
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setErreur("Email ou mot de passe incorrect.");
+      setChargement(false);
+      return;
+    }
+
+    // Si l'utilisateur venait d'une page protégée (admin/proprietaire), on respecte ce chemin
+    const redirectExplicite = searchParams.get("redirect");
+
+    if (redirectExplicite && redirectExplicite !== "/") {
+      setChargement(false);
+      router.push(redirectExplicite);
+      router.refresh();
+      return;
+    }
+
+    // Sinon, on détecte le rôle pour l'envoyer au bon espace
+    const userId = authData.user.id;
+
+    const { data: admin } = await supabase
+      .from("admins")
+      .select("id")
+      .eq("auth_id", userId)
+      .maybeSingle();
+
+    if (admin) {
+      setChargement(false);
+      router.push("/admin/proprietaires");
+      router.refresh();
+      return;
+    }
+
+    const { data: proprietaire } = await supabase
+      .from("proprietaires")
+      .select("id")
+      .eq("auth_id", userId)
+      .maybeSingle();
+
+    if (proprietaire) {
+      setChargement(false);
+      router.push("/proprietaire/dashboard");
+      router.refresh();
+      return;
+    }
+
+    // Simple client : accueil (ou destination initiale s'il y en avait une)
+    setChargement(false);
+    router.push(redirect);
+    router.refresh();
+  }
+
+  return (
+    <>
+      <Header />
+      <div className="max-w-md mx-auto px-4 py-16">
+        <h1 className="text-2xl font-bold text-anthracite-800 mb-6">
+          Connexion
+        </h1>
+
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-anthracite-600 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-anthracite-600 mb-1">
+              Mot de passe
+            </label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
+            />
+          </div>
+
+          {erreur && <p className="text-rouge-500 text-sm">{erreur}</p>}
+
+          <button
+            type="submit"
+            disabled={chargement}
+            className="w-full bg-bleu-600 hover:bg-bleu-700 text-white font-semibold py-2.5 rounded-md transition disabled:opacity-50"
+          >
+            {chargement ? "Connexion..." : "Se connecter"}
+          </button>
+        </form>
+
+        <p className="text-sm text-anthracite-400 mt-6 text-center">
+          Pas encore de compte ?{" "}
+          <a
+            href={`/auth/register?redirect=${encodeURIComponent(redirect)}`}
+            className="text-bleu-600 font-medium hover:underline"
+          >
+            Inscrivez-vous
+          </a>
+        </p>
+        <p className="text-xs text-anthracite-400 mt-2 text-center">
+          Vous êtes propriétaire ?{" "}
+          <a
+            href="/auth/register?type=proprietaire"
+            className="text-bleu-600 hover:underline"
+          >
+            Inscription partenaire
+          </a>
+        </p>
+      </div>
+    </>
+  );
+}
