@@ -17,6 +17,7 @@ export default function RegisterPage() {
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState(false);
   const [chargement, setChargement] = useState(false);
+  const [etapeChargement, setEtapeChargement] = useState("");
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,6 +34,7 @@ export default function RegisterPage() {
     }
 
     setChargement(true);
+    setEtapeChargement("Création du compte...");
 
     const supabase = createClient();
 
@@ -57,6 +59,8 @@ export default function RegisterPage() {
       const cheminRecto = `${authData.user.id}/piece-recto.${extRecto}`;
       const cheminVerso = `${authData.user.id}/piece-verso.${extVerso}`;
 
+      setEtapeChargement("Envoi de la pièce d'identité...");
+
       const { error: uploadRectoError } = await supabase.storage
         .from("pieces-identite")
         .upload(cheminRecto, pieceRecto, { upsert: true });
@@ -77,6 +81,46 @@ export default function RegisterPage() {
         return;
       }
 
+      // 2.5 Vérification automatique que le document ressemble bien à une
+      // pièce d'identité (OCR). Ne remplace pas la validation manuelle par
+      // l'admin, mais bloque tout de suite les cas évidents (mauvaise photo,
+      // document non lisible, fichier non pertinent...).
+      setEtapeChargement("Vérification du document...");
+
+      let ocrValide = true;
+      let ocrTexte = "";
+
+      try {
+        const { data: signedUrlData } = await supabase.storage
+          .from("pieces-identite")
+          .createSignedUrl(cheminRecto, 60 * 5);
+
+        if (signedUrlData?.signedUrl) {
+          const reponseOcr = await fetch("/api/verification/piece-identite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: signedUrlData.signedUrl }),
+          });
+          const resultatOcr = await reponseOcr.json();
+          ocrValide = resultatOcr.valide;
+          ocrTexte = resultatOcr.texteDetecte || "";
+        }
+      } catch (ocrErr) {
+        console.error("Erreur vérification OCR :", ocrErr);
+        // On ne bloque pas l'inscription si l'OCR échoue techniquement,
+        // l'admin validera manuellement.
+      }
+
+      if (!ocrValide) {
+        setErreur(
+          "Le document envoyé (recto) ne semble pas être une pièce d'identité lisible. Merci de vérifier la photo (bien cadrée, nette, non coupée) et réessayer."
+        );
+        setChargement(false);
+        return;
+      }
+
+      setEtapeChargement("Finalisation...");
+
       const { error: profilError } = await supabase.from("proprietaires").insert({
         auth_id: authData.user.id,
         nom,
@@ -84,6 +128,8 @@ export default function RegisterPage() {
         email,
         piece_identite_recto_path: cheminRecto,
         piece_identite_verso_path: cheminVerso,
+        piece_identite_ocr_valide: ocrValide,
+        piece_identite_ocr_texte: ocrTexte,
         cgu_accepted_at: maintenant,
       });
 
@@ -263,7 +309,7 @@ export default function RegisterPage() {
             disabled={chargement}
             className="w-full bg-bleu-600 hover:bg-bleu-700 text-white font-semibold py-2.5 rounded-md transition disabled:opacity-50"
           >
-            {chargement ? "Inscription..." : "S'inscrire"}
+            {chargement ? etapeChargement || "Inscription..." : "S'inscrire"}
           </button>
         </form>
       </div>

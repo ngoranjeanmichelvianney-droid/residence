@@ -1,12 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { verifierPaiementGenius } from "@/lib/geniuspay";
 import Header from "@/components/Header";
 import Link from "next/link";
 import { CheckCircle2, Clock, MapPin, Phone } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConfirmationPage({ params }) {
+export default async function ConfirmationPage({ params, searchParams }) {
   const supabase = createClient();
 
   let { data: reservation } = await supabase
@@ -29,41 +28,44 @@ export default async function ConfirmationPage({ params }) {
     );
   }
 
-  // Si pas encore marqué payé en base (ex: pas de webhook en local),
-  // on vérifie directement auprès de GeniusPay avant d'afficher la page.
-  if (!reservation.paye && reservation.reference_paiement) {
-    try {
-      const paiement = await verifierPaiementGenius(reservation.reference_paiement);
+  // GeniusPay ajoute directement le statut du paiement en paramètres de son
+  // URL de retour (ex: ?reference=...&status=completed) : on s'en sert en
+  // priorité, c'est plus fiable et immédiat qu'un appel API supplémentaire.
+  const statutRetour = searchParams?.status;
+  const referenceRetour = searchParams?.reference;
 
-      // En sandbox, GeniusPay renvoie "scenario" plutôt que "status".
-      const succes = paiement.status === "success" || paiement.scenario === "success";
+  const paiementConfirmeParRetour =
+    statutRetour === "completed" || statutRetour === "success";
 
-      if (succes) {
-        await supabase
-          .from("reservations")
-          .update({
-            paye: true,
-            paye_at: new Date().toISOString(),
-            statut: "confirmee",
-          })
-          .eq("id", reservation.id);
+  if (!reservation.paye && paiementConfirmeParRetour) {
+    // Sécurité minimale : la référence renvoyée doit correspondre à celle
+    // enregistrée pour cette réservation (évite qu'un lien trafiqué confirme
+    // n'importe quelle réservation).
+    const referenceValide =
+      !reservation.reference_paiement || reservation.reference_paiement === referenceRetour;
 
-        await supabase
-          .from("residences")
-          .update({ disponible: false })
-          .eq("id", reservation.residence_id);
+    if (referenceValide) {
+      await supabase
+        .from("reservations")
+        .update({
+          paye: true,
+          paye_at: new Date().toISOString(),
+          statut: "confirmee",
+        })
+        .eq("id", reservation.id);
 
-        // On relit la réservation à jour pour l'affichage
-        const { data: reservationMaj } = await supabase
-          .from("reservations")
-          .select("*, residences(titre, adresse, proprietaires(nom, telephone))")
-          .eq("id", reservation.id)
-          .single();
+      await supabase
+        .from("residences")
+        .update({ disponible: false })
+        .eq("id", reservation.residence_id);
 
-        reservation = reservationMaj;
-      }
-    } catch (err) {
-      console.error("Erreur vérification paiement GeniusPay :", err);
+      const { data: reservationMaj } = await supabase
+        .from("reservations")
+        .select("*, residences(titre, adresse, proprietaires(nom, telephone))")
+        .eq("id", reservation.id)
+        .single();
+
+      reservation = reservationMaj;
     }
   }
 

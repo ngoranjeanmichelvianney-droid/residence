@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, MapPin, Users } from "lucide-react";
 export default function ResidenceCard({ residence }) {
   const [index, setIndex] = useState(0);
   const images = residence.images?.length > 0 ? residence.images : [];
+  const indisponible = residence.disponible === false;
 
   function prev(e) {
     e.preventDefault();
@@ -31,7 +32,9 @@ export default function ResidenceCard({ residence }) {
                 src={images[index]}
                 alt={residence.titre}
                 fill
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
+                  indisponible ? "grayscale opacity-70" : ""
+                }`}
               />
 
               {images.length > 1 && (
@@ -66,7 +69,7 @@ export default function ResidenceCard({ residence }) {
                 {residence.prix_nuit?.toLocaleString("fr-FR")} F/nuit
               </span>
 
-              {residence.disponible === false && (
+              {indisponible && (
                 <span className="absolute top-3 left-3 bg-anthracite-800/80 text-white text-xs font-bold px-3 py-1 rounded-full shadow">
                   Indisponible
                 </span>
@@ -103,12 +106,18 @@ export default function ResidenceCard({ residence }) {
       </Link>
 
       <div className="px-4 pb-4">
-        <Link
-          href={`/residences/${residence.id}`}
-          className="block w-full text-center bg-rouge-500 hover:bg-rouge-600 text-white font-semibold py-2.5 rounded-lg transition"
-        >
-          Réserver
-        </Link>
+        {indisponible ? (
+          <div className="block w-full text-center bg-anthracite-100 text-anthracite-400 font-semibold py-2.5 rounded-lg cursor-not-allowed">
+            Indisponible
+          </div>
+        ) : (
+          <Link
+            href={`/residences/${residence.id}`}
+            className="block w-full text-center bg-rouge-500 hover:bg-rouge-600 text-white font-semibold py-2.5 rounded-lg transition"
+          >
+            Réserver
+          </Link>
+        )}
       </div>
     </div>
   );

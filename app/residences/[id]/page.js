@@ -5,6 +5,48 @@ import NoterResidence from "@/components/NoterResidence";
 import { MapPin, Users, Star } from "lucide-react";
 import Link from "next/link";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://homtesti.com";
+
+export async function generateMetadata({ params }) {
+  const supabase = createClient();
+
+  const { data: residence } = await supabase
+    .from("residences")
+    .select("titre, description, adresse, prix_nuit, images")
+    .eq("id", params.id)
+    .single();
+
+  if (!residence) {
+    return { title: "Résidence introuvable | Les Résidences Testi" };
+  }
+
+  const titre = `${residence.titre} — ${residence.adresse} | Les Résidences Testi`;
+  const description =
+    residence.description?.slice(0, 155) ||
+    `Réservez ${residence.titre} à ${residence.adresse}, à partir de ${residence.prix_nuit?.toLocaleString("fr-FR")} FCFA / nuit.`;
+  const image = residence.images?.[0];
+
+  return {
+    title: titre,
+    description,
+    openGraph: {
+      title: titre,
+      description,
+      url: `${SITE_URL}/residences/${params.id}`,
+      siteName: "Les Résidences Testi",
+      images: image ? [{ url: image, width: 1200, height: 630 }] : [],
+      locale: "fr_FR",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: titre,
+      description,
+      images: image ? [image] : [],
+    },
+  };
+}
+
 export default async function ResidenceDetailPage({ params, searchParams }) {
   const supabase = createClient();
 
@@ -36,7 +78,6 @@ export default async function ResidenceDetailPage({ params, searchParams }) {
       ? avis.reduce((somme, a) => somme + a.note, 0) / nombreAvis
       : null;
 
-  // Vérifie si le client connecté peut laisser une note
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -78,8 +119,34 @@ export default async function ResidenceDetailPage({ params, searchParams }) {
     }
   }
 
+  // Données structurées pour les moteurs de recherche (schema.org)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name: residence.titre,
+    description: residence.description,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: residence.adresse,
+      addressCountry: "CI",
+    },
+    image: residence.images?.[0],
+    priceRange: `${residence.prix_nuit} XOF`,
+    ...(noteMoyenne !== null && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: noteMoyenne.toFixed(1),
+        reviewCount: nombreAvis,
+      },
+    }),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
       <div className="max-w-4xl mx-auto px-4 py-10">
         <GalerieImages images={residence.images} titre={residence.titre} />
