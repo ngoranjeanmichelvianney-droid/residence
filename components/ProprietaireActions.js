@@ -1,62 +1,47 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import emailjs from "@emailjs/browser";
 
-// À remplir une fois le nom de domaine et le compte EmailJS configurés
-const EMAILJS_SERVICE_ID = "TON_SERVICE_ID";
-const EMAILJS_TEMPLATE_ID = "TON_TEMPLATE_ID";
-const EMAILJS_PUBLIC_KEY = "TA_PUBLIC_KEY";
-
-export default function ProprietaireActions({ id, nom, email }) {
+export default function ProprietaireActions({ id, nom }) {
   const router = useRouter();
   const supabase = createClient();
+  const [erreur, setErreur] = useState("");
 
   async function changerStatut(statut) {
-    const updates = { statut };
+    setErreur("");
 
-    // Si validation, on marque la bannière de bienvenue à afficher côté propriétaire
-    if (statut === "actif") {
-      updates.validation_vue = false;
-    }
+    const { error } = await supabase
+      .from("proprietaires")
+      .update({ statut })
+      .eq("id", id);
 
-    await supabase.from("proprietaires").update(updates).eq("id", id);
-
-    if (statut === "actif") {
-      try {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            to_name: nom,
-            to_email: email,
-          },
-          EMAILJS_PUBLIC_KEY
-        );
-      } catch (err) {
-        // On n'empêche pas la validation si l'email échoue (ex: pas encore configuré)
-        console.error("Erreur envoi email de validation :", err);
-      }
+    if (error) {
+      setErreur("Erreur : " + error.message);
+      return;
     }
 
     router.refresh();
   }
 
   return (
-    <div className="flex gap-2">
-      <button
-        onClick={() => changerStatut("actif")}
-        className="bg-bleu-600 hover:bg-bleu-700 text-white text-sm font-medium px-3 py-1.5 rounded-md transition"
-      >
-        Valider
-      </button>
-      <button
-        onClick={() => changerStatut("refuse")}
-        className="bg-rouge-500 hover:bg-rouge-600 text-white text-sm font-medium px-3 py-1.5 rounded-md transition"
-      >
-        Refuser
-      </button>
+    <div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => changerStatut("actif")}
+          className="bg-bleu-600 hover:bg-bleu-700 text-white text-sm font-medium px-3 py-1.5 rounded-md transition"
+        >
+          Valider
+        </button>
+        <button
+          onClick={() => changerStatut("refuse")}
+          className="bg-rouge-500 hover:bg-rouge-600 text-white text-sm font-medium px-3 py-1.5 rounded-md transition"
+        >
+          Refuser
+        </button>
+      </div>
+      {erreur && <p className="text-rouge-500 text-xs mt-1">{erreur}</p>}
     </div>
   );
 }

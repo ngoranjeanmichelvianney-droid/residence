@@ -5,8 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/Header";
 
+// Même conversion que sur la page d'inscription : le numéro de téléphone
+// est transformé en email technique pour Supabase Auth, en interne.
+function telephoneVersEmailTechnique(telephone) {
+  const nettoye = telephone.replace(/[^0-9]/g, "");
+  return `${nettoye}@homtesti.local`;
+}
+
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState("");
   const [chargement, setChargement] = useState(false);
@@ -21,13 +28,15 @@ export default function LoginPage() {
     setChargement(true);
 
     const supabase = createClient();
+    const emailTechnique = telephoneVersEmailTechnique(telephone);
+
     const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: emailTechnique,
       password,
     });
 
     if (error) {
-      setErreur("Email ou mot de passe incorrect.");
+      setErreur("Numéro de téléphone ou mot de passe incorrect.");
       setChargement(false);
       return;
     }
@@ -88,13 +97,14 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-anthracite-600 mb-1">
-              Email
+              Téléphone
             </label>
             <input
-              type="email"
+              type="tel"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="+225 XX XX XX XX XX"
+              value={telephone}
+              onChange={(e) => setTelephone(e.target.value)}
               className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
             />
           </div>

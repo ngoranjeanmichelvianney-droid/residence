@@ -33,8 +33,8 @@ export default async function AdminProprietairesPage() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold text-anthracite-800 mb-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 sm:py-10">
+      <h1 className="text-xl sm:text-2xl font-bold text-anthracite-800 mb-4 sm:mb-6">
         Gestion des propriétaires
       </h1>
 
@@ -42,15 +42,15 @@ export default async function AdminProprietairesPage() {
         {proprietairesAvecPieces.map((p) => (
           <div
             key={p.id}
-            className="flex items-center justify-between bg-white border border-anthracite-100 rounded-lg p-4"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-anthracite-100 rounded-lg p-4"
           >
-            <div>
-              <p className="font-semibold text-anthracite-800">{p.nom}</p>
-              <p className="text-sm text-anthracite-400">
+            <div className="min-w-0">
+              <p className="font-semibold text-anthracite-800 truncate">{p.nom}</p>
+              <p className="text-sm text-anthracite-400 break-words">
                 {p.email} · {p.telephone}
               </p>
 
-              <div className="flex items-center gap-3 mt-1">
+              <div className="flex flex-wrap items-center gap-3 mt-1">
                 {p.urlRecto ? (
                   <a
                     href={p.urlRecto}
@@ -78,9 +78,9 @@ export default async function AdminProprietairesPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:flex-shrink-0">
               <span
-                className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                className={`text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap ${
                   p.statut === "actif"
                     ? "bg-bleu-100 text-bleu-600"
                     : p.statut === "refuse"

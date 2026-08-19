@@ -6,10 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/Header";
 
+// Supabase Auth a besoin d'un identifiant unique de type email.
+// Le propriétaire ne saisit qu'un numéro de téléphone ; on génère un email
+// technique en interne, jamais montré ni utilisé pour le contacter.
+function telephoneVersEmailTechnique(telephone) {
+  const nettoye = telephone.replace(/[^0-9]/g, "");
+  return `${nettoye}@homtesti.local`;
+}
+
 export default function RegisterPage() {
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pieceRecto, setPieceRecto] = useState(null);
   const [pieceVerso, setPieceVerso] = useState(null);
@@ -37,15 +44,20 @@ export default function RegisterPage() {
     setEtapeChargement("Création du compte...");
 
     const supabase = createClient();
+    const emailTechnique = telephoneVersEmailTechnique(telephone);
 
-    // 1. Créer le compte auth
+    // 1. Créer le compte auth (identifiant = numéro de téléphone en interne)
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
+      email: emailTechnique,
       password,
     });
 
     if (authError) {
-      setErreur(authError.message);
+      setErreur(
+        authError.message.includes("already registered")
+          ? "Ce numéro de téléphone est déjà utilisé."
+          : authError.message
+      );
       setChargement(false);
       return;
     }
@@ -81,65 +93,52 @@ export default function RegisterPage() {
         return;
       }
 
-      // 2.5 Vérification automatique que le document ressemble bien à une
-      // pièce d'identité (OCR). Ne remplace pas la validation manuelle par
-      // l'admin, mais bloque tout de suite les cas évidents (mauvaise photo,
-      // document non lisible, fichier non pertinent...).
-      setEtapeChargement("Vérification du document...");
-
-      let ocrValide = true;
-      let ocrTexte = "";
-
-      try {
-        const { data: signedUrlData } = await supabase.storage
-          .from("pieces-identite")
-          .createSignedUrl(cheminRecto, 60 * 5);
-
-        if (signedUrlData?.signedUrl) {
-          const reponseOcr = await fetch("/api/verification/piece-identite", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ imageUrl: signedUrlData.signedUrl }),
-          });
-          const resultatOcr = await reponseOcr.json();
-          ocrValide = resultatOcr.valide;
-          ocrTexte = resultatOcr.texteDetecte || "";
-        }
-      } catch (ocrErr) {
-        console.error("Erreur vérification OCR :", ocrErr);
-        // On ne bloque pas l'inscription si l'OCR échoue techniquement,
-        // l'admin validera manuellement.
-      }
-
-      if (!ocrValide) {
-        setErreur(
-          "Le document envoyé (recto) ne semble pas être une pièce d'identité lisible. Merci de vérifier la photo (bien cadrée, nette, non coupée) et réessayer."
-        );
-        setChargement(false);
-        return;
-      }
-
       setEtapeChargement("Finalisation...");
 
-      const { error: profilError } = await supabase.from("proprietaires").insert({
-        auth_id: authData.user.id,
-        nom,
-        telephone,
-        email,
-        piece_identite_recto_path: cheminRecto,
-        piece_identite_verso_path: cheminVerso,
-        piece_identite_ocr_valide: ocrValide,
-        piece_identite_ocr_texte: ocrTexte,
-        cgu_accepted_at: maintenant,
-      });
-
-      setChargement(false);
+      // Le profil est créé tout de suite, sans attendre le résultat de l'OCR
+      // (piece_identite_ocr_valide reste "null" = vérification en cours).
+      const { data: proprietaireCree, error: profilError } = await supabase
+        .from("proprietaires")
+        .insert({
+          auth_id: authData.user.id,
+          nom,
+          telephone,
+          piece_identite_recto_path: cheminRecto,
+          piece_identite_verso_path: cheminVerso,
+          piece_identite_ocr_valide: null,
+          cgu_accepted_at: maintenant,
+        })
+        .select()
+        .single();
 
       if (profilError) {
+        setChargement(false);
         setErreur("Erreur lors de la création du profil : " + profilError.message);
         return;
       }
 
+      // On lance la vérification OCR en arrière-plan, SANS attendre sa
+      // réponse : elle mettra à jour la base elle-même une fois terminée.
+      // L'inscription du propriétaire n'est donc plus ralentie par l'OCR.
+      supabase.storage
+        .from("pieces-identite")
+        .createSignedUrl(cheminRecto, 60 * 10)
+        .then(({ data: signedUrlData }) => {
+          if (signedUrlData?.signedUrl) {
+            fetch("/api/verification/piece-identite", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                imageUrl: signedUrlData.signedUrl,
+                proprietaireId: proprietaireCree.id,
+              }),
+            }).catch((err) =>
+              console.error("Erreur envoi vérification OCR (arrière-plan) :", err)
+            );
+          }
+        });
+
+      setChargement(false);
       setSucces(true);
       return;
     }
@@ -149,7 +148,6 @@ export default function RegisterPage() {
       auth_id: authData.user.id,
       nom,
       telephone,
-      email,
       cgu_accepted_at: maintenant,
     });
 
@@ -223,6 +221,9 @@ export default function RegisterPage() {
               onChange={(e) => setTelephone(e.target.value)}
               className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
             />
+            <p className="text-xs text-anthracite-400 mt-1">
+              Ce numéro sert d&apos;identifiant pour vous connecter.
+            </p>
           </div>
 
           {typeProprietaire && (
@@ -257,19 +258,6 @@ export default function RegisterPage() {
               </div>
             </>
           )}
-
-          <div>
-            <label className="block text-sm font-medium text-anthracite-600 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
-            />
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-anthracite-600 mb-1">
