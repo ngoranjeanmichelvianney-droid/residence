@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function ProprietaireActions({ id, nom }) {
+export default function ProprietaireActions({ id, nom, email }) {
   const router = useRouter();
   const supabase = createClient();
   const [erreur, setErreur] = useState("");
@@ -20,6 +20,15 @@ export default function ProprietaireActions({ id, nom }) {
     if (error) {
       setErreur("Erreur : " + error.message);
       return;
+    }
+
+    // Envoie l'email de confirmation uniquement quand le compte est validé
+    if (statut === "actif" && email) {
+      fetch("/api/notifications/compte-valide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, nom }),
+      }).catch((err) => console.error("Erreur envoi email compte validé :", err));
     }
 
     router.refresh();

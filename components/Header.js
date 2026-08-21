@@ -87,6 +87,12 @@ export default function Header() {
             </Link>
           )}
 
+          {statut === "proprietaire" && (
+            <Link href="/proprietaire/messages" className="hover:text-jaune-300 transition">
+              Messages
+            </Link>
+          )}
+
           {statut === "visiteur" && (
             <Link href="/auth/register?type=proprietaire" className="hover:text-jaune-300 transition">
               Devenir partenaire
@@ -108,6 +114,12 @@ export default function Header() {
           {statut === "client" && (
             <Link href="/mes-reservations" className="hover:text-jaune-300 transition">
               Mes réservations
+            </Link>
+          )}
+
+          {statut === "client" && (
+            <Link href="/mes-messages" className="hover:text-jaune-300 transition">
+              Messages
             </Link>
           )}
 
@@ -166,6 +178,16 @@ export default function Header() {
             </Link>
           )}
 
+          {statut === "proprietaire" && (
+            <Link
+              href="/proprietaire/messages"
+              onClick={() => setMenuOuvert(false)}
+              className="hover:text-jaune-300 transition"
+            >
+              Messages
+            </Link>
+          )}
+
           {statut === "visiteur" && (
             <Link
               href="/auth/register?type=proprietaire"
@@ -203,6 +225,16 @@ export default function Header() {
               className="hover:text-jaune-300 transition"
             >
               Mes réservations
+            </Link>
+          )}
+
+          {statut === "client" && (
+            <Link
+              href="/mes-messages"
+              onClick={() => setMenuOuvert(false)}
+              className="hover:text-jaune-300 transition"
+            >
+              Messages
             </Link>
           )}
 

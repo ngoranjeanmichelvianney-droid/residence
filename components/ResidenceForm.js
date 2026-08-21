@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import SelecteurCarte from "./SelecteurCarte";
 
 export default function ResidenceForm({ proprietaireId, residence = null }) {
   const router = useRouter();
@@ -13,6 +14,8 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
   const [adresse, setAdresse] = useState(residence?.adresse || "");
   const [prixNuit, setPrixNuit] = useState(residence?.prix_nuit || "");
   const [capacite, setCapacite] = useState(residence?.capacite || 1);
+  const [latitude, setLatitude] = useState(residence?.latitude || null);
+  const [longitude, setLongitude] = useState(residence?.longitude || null);
   const [imagesExistantes, setImagesExistantes] = useState(residence?.images || []);
   const [nouveauxFichiers, setNouveauxFichiers] = useState([]);
   const [videoUrl, setVideoUrl] = useState(residence?.video_url || "");
@@ -28,16 +31,15 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
   }
 
   function nettoyerNomFichier(nomOriginal) {
-    // Sépare le nom et l'extension
     const dernierPoint = nomOriginal.lastIndexOf(".");
     const extension = dernierPoint !== -1 ? nomOriginal.slice(dernierPoint) : "";
     const nomSansExtension = dernierPoint !== -1 ? nomOriginal.slice(0, dernierPoint) : nomOriginal;
 
     const nomNettoye = nomSansExtension
       .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // retire les accents
-      .replace(/[^a-zA-Z0-9]/g, "-") // remplace tout le reste (espaces, parenthèses...) par des tirets
-      .replace(/-+/g, "-") // évite les tirets multiples
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]/g, "-")
+      .replace(/-+/g, "-")
       .toLowerCase();
 
     return nomNettoye + extension.toLowerCase();
@@ -79,6 +81,8 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
         adresse,
         prix_nuit: parseFloat(prixNuit),
         capacite: parseInt(capacite),
+        latitude,
+        longitude,
         images: toutesLesImages,
         video_url: videoUrl || null,
         statut: statutFinal,
@@ -142,6 +146,20 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
           onChange={(e) => setAdresse(e.target.value)}
           placeholder="Ex : Cocody, Abidjan"
           className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-anthracite-600 mb-1">
+          Localisation GPS
+        </label>
+        <SelecteurCarte
+          latitude={latitude}
+          longitude={longitude}
+          onChange={({ latitude: lat, longitude: lng }) => {
+            setLatitude(lat);
+            setLongitude(lng);
+          }}
         />
       </div>
 

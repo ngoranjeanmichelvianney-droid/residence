@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/Header";
 
-// Même conversion que sur la page d'inscription : le numéro de téléphone
-// est transformé en email technique pour Supabase Auth, en interne.
 function telephoneVersEmailTechnique(telephone) {
   const nettoye = telephone.replace(/[^0-9]/g, "");
   return `${nettoye}@homtesti.local`;
@@ -41,7 +39,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Si l'utilisateur venait d'une page protégée (admin/proprietaire), on respecte ce chemin
     const redirectExplicite = searchParams.get("redirect");
 
     if (redirectExplicite && redirectExplicite !== "/") {
@@ -51,7 +48,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Sinon, on détecte le rôle pour l'envoyer au bon espace
     const userId = authData.user.id;
 
     const { data: admin } = await supabase
@@ -80,7 +76,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Simple client : accueil (ou destination initiale s'il y en avait une)
     setChargement(false);
     router.push(redirect);
     router.refresh();
@@ -132,6 +127,12 @@ export default function LoginPage() {
             {chargement ? "Connexion..." : "Se connecter"}
           </button>
         </form>
+
+        <p className="text-sm text-center mt-3">
+          <a href="/auth/mot-de-passe-oublie" className="text-bleu-600 hover:underline">
+            Mot de passe oublié ?
+          </a>
+        </p>
 
         <p className="text-sm text-anthracite-400 mt-6 text-center">
           Pas encore de compte ?{" "}

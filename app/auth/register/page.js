@@ -17,6 +17,7 @@ function telephoneVersEmailTechnique(telephone) {
 export default function RegisterPage() {
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pieceRecto, setPieceRecto] = useState(null);
   const [pieceVerso, setPieceVerso] = useState(null);
@@ -30,6 +31,14 @@ export default function RegisterPage() {
   const searchParams = useSearchParams();
   const typeProprietaire = searchParams.get("type") === "proprietaire";
   const redirect = searchParams.get("redirect") || "/";
+
+  function envoyerEmailBienvenue(nomPersonne, typeCompte) {
+    fetch("/api/notifications/bienvenue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, nom: nomPersonne, typeCompte }),
+    }).catch((err) => console.error("Erreur envoi email bienvenue :", err));
+  }
 
   async function handleRegister(e) {
     e.preventDefault();
@@ -103,6 +112,7 @@ export default function RegisterPage() {
           auth_id: authData.user.id,
           nom,
           telephone,
+          email,
           piece_identite_recto_path: cheminRecto,
           piece_identite_verso_path: cheminVerso,
           piece_identite_ocr_valide: null,
@@ -138,6 +148,8 @@ export default function RegisterPage() {
           }
         });
 
+      envoyerEmailBienvenue(nom, "proprietaire");
+
       setChargement(false);
       setSucces(true);
       return;
@@ -148,6 +160,7 @@ export default function RegisterPage() {
       auth_id: authData.user.id,
       nom,
       telephone,
+      email,
       cgu_accepted_at: maintenant,
     });
 
@@ -157,6 +170,8 @@ export default function RegisterPage() {
       setErreur("Erreur lors de la création du profil : " + clientError.message);
       return;
     }
+
+    envoyerEmailBienvenue(nom, "client");
 
     router.push(redirect);
     router.refresh();
@@ -223,6 +238,24 @@ export default function RegisterPage() {
             />
             <p className="text-xs text-anthracite-400 mt-1">
               Ce numéro sert d&apos;identifiant pour vous connecter.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-anthracite-600 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              required
+              placeholder="vous@exemple.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
+            />
+            <p className="text-xs text-anthracite-400 mt-1">
+              Utilisé pour vos confirmations et pour réinitialiser votre mot de
+              passe si besoin.
             </p>
           </div>
 

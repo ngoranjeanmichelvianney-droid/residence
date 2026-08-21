@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import Link from "next/link";
-import { CheckCircle2, Clock, MapPin, Phone } from "lucide-react";
+import { CheckCircle2, Clock, MapPin, MessageCircle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
   let { data: reservation } = await supabase
     .from("reservations")
-    .select("*, residences(titre, adresse, proprietaires(nom, telephone))")
+    .select("*, residences(id, titre, adresse, proprietaires(nom))")
     .eq("id", params.id)
     .single();
 
@@ -61,7 +61,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
       const { data: reservationMaj } = await supabase
         .from("reservations")
-        .select("*, residences(titre, adresse, proprietaires(nom, telephone))")
+        .select("*, residences(id, titre, adresse, proprietaires(nom))")
         .eq("id", reservation.id)
         .single();
 
@@ -70,7 +70,6 @@ export default async function ConfirmationPage({ params, searchParams }) {
   }
 
   const residence = reservation.residences;
-  const proprietaireTelephone = residence?.proprietaires?.telephone;
   const proprietaireNom = residence?.proprietaires?.nom;
 
   return (
@@ -133,29 +132,12 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
           {reservation.paye && (
             <div className="border-t border-anthracite-100 pt-3">
-              {proprietaireTelephone ? (
-                <div className="bg-bleu-50 rounded-md p-3 flex items-center gap-3">
-                  <Phone size={18} className="text-bleu-600 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-anthracite-500">
-                      Contact du propriétaire
-                      {proprietaireNom ? ` (${proprietaireNom})` : ""} — pour toute
-                      information ou complication en vous rendant à la résidence
-                    </p>
-                    <a
-                      href={`tel:${proprietaireTelephone}`}
-                      className="text-bleu-600 font-bold text-base hover:underline"
-                    >
-                      {proprietaireTelephone}
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-anthracite-500">
-                  Le numéro du propriétaire n&apos;est pas encore renseigné. Vous
-                  serez contacté directement pour les détails d&apos;arrivée.
-                </p>
-              )}
+              <p className="text-xs text-anthracite-500 mb-2">
+                Pour toute question ou précision sur votre arrivée, contactez
+                {proprietaireNom ? ` ${proprietaireNom}` : " le propriétaire"} directement
+                via la messagerie HomTesti.
+              </p>
+              <ContacterProprietaireBouton residenceId={residence?.id} />
             </div>
           )}
         </div>
@@ -168,5 +150,18 @@ export default async function ConfirmationPage({ params, searchParams }) {
         </Link>
       </div>
     </>
+  );
+}
+
+// Composant client minimal, uniquement pour le bouton (créer/ouvrir la conversation)
+function ContacterProprietaireBouton({ residenceId }) {
+  return (
+    <a
+      href={`/api/messages/conversation/creer-et-rediriger?residenceId=${residenceId}`}
+      className="flex items-center justify-center gap-2 w-full bg-bleu-600 hover:bg-bleu-700 text-white font-semibold py-2.5 rounded-md transition"
+    >
+      <MessageCircle size={18} />
+      Contacter le propriétaire
+    </a>
   );
 }
