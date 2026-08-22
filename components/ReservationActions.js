@@ -25,7 +25,7 @@ export default function ReservationActions({ id, residenceId, statut }) {
     return (
       <div className="flex gap-2">
         <button
-          onClick={() => changerStatut("confirmee")}
+          onClick={() => changerStatut("en_attente_paiement")}
           className="bg-bleu-600 hover:bg-bleu-700 text-white text-sm font-medium px-4 py-2 rounded-md transition"
         >
           Confirmer
@@ -37,6 +37,14 @@ export default function ReservationActions({ id, residenceId, statut }) {
           Refuser
         </button>
       </div>
+    );
+  }
+
+  if (statut === "en_attente_paiement") {
+    return (
+      <span className="text-xs text-jaune-600 font-medium">
+        En attente du paiement du client
+      </span>
     );
   }
 

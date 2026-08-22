@@ -9,8 +9,6 @@ export default function ReserverResidence({
   prixNuit,
   client,
   disponible,
-  proprietaireTelephone,
-  proprietaireNom,
   dateArriveeInitiale = "",
   dateDepartInitiale = "",
   messageInitial = "",
@@ -20,6 +18,7 @@ export default function ReserverResidence({
   const [message, setMessage] = useState(messageInitial);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [demandeEnvoyee, setDemandeEnvoyee] = useState(false);
   const router = useRouter();
 
   const nuits =
@@ -43,7 +42,7 @@ export default function ReserverResidence({
     router.push(`/auth/login?redirect=${encodeURIComponent(retour)}`);
   }
 
-  async function handleReservation(e) {
+  async function handleDemande(e) {
     e.preventDefault();
     setErreur("");
 
@@ -65,7 +64,7 @@ export default function ReserverResidence({
     setChargement(true);
 
     try {
-      const reponse = await fetch("/api/paiement/creer", {
+      const reponse = await fetch("/api/reservations/demander", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -78,22 +77,12 @@ export default function ReserverResidence({
 
       const donnees = await reponse.json();
 
-      // TEMPORAIRE : à retirer une fois que le paiement redirige correctement.
-      // Ouvre la console navigateur (F12) pour voir la réponse exacte de l'API.
-      console.log("Réponse /api/paiement/creer :", donnees);
-
       if (!reponse.ok) {
-        throw new Error(donnees.message || "Erreur lors de l'initiation du paiement.");
+        throw new Error(donnees.message || "Erreur lors de la demande de réservation.");
       }
 
-      if (!donnees.paymentLink) {
-        throw new Error(
-          "Le lien de paiement est manquant dans la réponse du serveur."
-        );
-      }
-
-      // Redirection vers la page de paiement GeniusPay
-      window.location.href = donnees.paymentLink;
+      setDemandeEnvoyee(true);
+      router.refresh();
     } catch (err) {
       setErreur(err.message || "Une erreur est survenue.");
       setChargement(false);
@@ -108,8 +97,22 @@ export default function ReserverResidence({
     );
   }
 
+  if (demandeEnvoyee) {
+    return (
+      <div className="bg-jaune-50 border border-jaune-300 rounded-lg p-5 text-sm text-anthracite-700">
+        <p className="font-semibold text-anthracite-800 mb-1">
+          Demande envoyée !
+        </p>
+        <p>
+          Le propriétaire doit valider votre demande. Une fois validée, vous
+          pourrez procéder au paiement depuis « Mes réservations ».
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleReservation} className="space-y-4">
+    <form onSubmit={handleDemande} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-anthracite-600 mb-1">
           Dates du séjour
@@ -155,11 +158,9 @@ export default function ReserverResidence({
         className="w-full bg-rouge-500 hover:bg-rouge-600 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
       >
         {chargement
-          ? "Redirection vers le paiement..."
+          ? "Envoi de la demande..."
           : client
-          ? nuits > 0
-            ? `Payer ${montant.toLocaleString("fr-FR")} FCFA`
-            : "Choisir mes dates"
+          ? "Envoyer la demande de réservation"
           : "Se connecter et réserver"}
       </button>
     </form>

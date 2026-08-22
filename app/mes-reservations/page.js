@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import ConfirmerPresence from "@/components/ConfirmerPresence";
+import BoutonPayerReservation from "@/components/BoutonPayerReservation";
 import Image from "next/image";
 import { Phone } from "lucide-react";
 
@@ -37,11 +38,17 @@ export default async function MesReservationsPage() {
     .order("date_arrivee", { ascending: false });
 
   const enCours = (reservations || []).filter(
-    (r) => r.statut !== "terminee" && r.statut !== "annulee"
+    (r) => r.statut !== "terminee" && r.statut !== "annulee" && r.statut !== "refusee"
   );
   const historique = (reservations || []).filter(
     (r) => r.statut === "terminee"
   );
+
+  const libelleStatut = {
+    en_attente: { texte: "En attente de validation du propriétaire", classe: "text-jaune-600" },
+    en_attente_paiement: { texte: "Validée — paiement requis", classe: "text-bleu-600" },
+    confirmee: { texte: "Confirmée", classe: "text-bleu-600" },
+  };
 
   return (
     <>
@@ -60,6 +67,7 @@ export default async function MesReservationsPage() {
               {enCours.map((r) => {
                 const telephone = r.residences?.proprietaires?.telephone;
                 const nomProprietaire = r.residences?.proprietaires?.nom;
+                const statutInfo = libelleStatut[r.statut];
 
                 return (
                   <div
@@ -84,15 +92,30 @@ export default async function MesReservationsPage() {
                         <p className="text-sm text-anthracite-400">
                           Du {r.date_arrivee} au {r.date_depart}
                         </p>
+                        {statutInfo && (
+                          <p className={`text-xs font-semibold mt-1 ${statutInfo.classe}`}>
+                            {statutInfo.texte}
+                          </p>
+                        )}
                       </div>
-                      {!r.presence_confirmee_at ? (
+                      {r.statut === "confirmee" && !r.presence_confirmee_at && (
                         <ConfirmerPresence reservationId={r.id} />
-                      ) : (
+                      )}
+                      {r.statut === "confirmee" && r.presence_confirmee_at && (
                         <span className="text-xs font-semibold text-bleu-600 whitespace-nowrap">
                           Présence confirmée
                         </span>
                       )}
                     </div>
+
+                    {r.statut === "en_attente_paiement" && (
+                      <div className="mt-3 pt-3 border-t border-anthracite-100">
+                        <BoutonPayerReservation
+                          reservationId={r.id}
+                          montant={r.montant}
+                        />
+                      </div>
+                    )}
 
                     {r.paye && (
                       <div className="mt-3 pt-3 border-t border-anthracite-100">

@@ -4,6 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import SelecteurCarte from "./SelecteurCarte";
+import { contientNumeroTelephone } from "@/lib/filtreMessages";
+
+function formaterPrixAffichage(valeurBrute) {
+  const chiffres = valeurBrute.replace(/[^0-9]/g, "");
+  if (!chiffres) return "";
+  return chiffres.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function nettoyerPrixVersNombre(valeurAffichee) {
+  const chiffres = valeurAffichee.replace(/[^0-9]/g, "");
+  return chiffres ? parseInt(chiffres, 10) : 0;
+}
 
 export default function ResidenceForm({ proprietaireId, residence = null }) {
   const router = useRouter();
@@ -12,15 +24,24 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
   const [titre, setTitre] = useState(residence?.titre || "");
   const [description, setDescription] = useState(residence?.description || "");
   const [adresse, setAdresse] = useState(residence?.adresse || "");
-  const [prixNuit, setPrixNuit] = useState(residence?.prix_nuit || "");
+  const [prixAffiche, setPrixAffiche] = useState(
+    residence?.prix_nuit ? formaterPrixAffichage(String(residence.prix_nuit)) : ""
+  );
   const [capacite, setCapacite] = useState(residence?.capacite || 1);
   const [latitude, setLatitude] = useState(residence?.latitude || null);
   const [longitude, setLongitude] = useState(residence?.longitude || null);
+  const [disponible, setDisponible] = useState(
+    residence?.disponible !== undefined ? residence.disponible : true
+  );
   const [imagesExistantes, setImagesExistantes] = useState(residence?.images || []);
   const [nouveauxFichiers, setNouveauxFichiers] = useState([]);
   const [videoUrl, setVideoUrl] = useState(residence?.video_url || "");
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
+
+  function handlePrixChange(e) {
+    setPrixAffiche(formaterPrixAffichage(e.target.value));
+  }
 
   function handleFichiers(e) {
     setNouveauxFichiers(Array.from(e.target.files));
@@ -68,6 +89,14 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
   async function handleSubmit(e, statutFinal) {
     e.preventDefault();
     setErreur("");
+
+    if (contientNumeroTelephone(titre) || contientNumeroTelephone(description) || contientNumeroTelephone(adresse)) {
+      setErreur(
+        "Le titre, la description et l'adresse ne doivent pas contenir de numéro de téléphone. Utilisez la messagerie pour échanger vos coordonnées avec les clients."
+      );
+      return;
+    }
+
     setChargement(true);
 
     try {
@@ -79,10 +108,11 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
         titre,
         description,
         adresse,
-        prix_nuit: parseFloat(prixNuit),
+        prix_nuit: nettoyerPrixVersNombre(prixAffiche),
         capacite: parseInt(capacite),
         latitude,
         longitude,
+        disponible,
         images: toutesLesImages,
         video_url: videoUrl || null,
         statut: statutFinal,
@@ -134,6 +164,9 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
           onChange={(e) => setDescription(e.target.value)}
           className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
         />
+        <p className="text-xs text-anthracite-400 mt-1">
+          N&apos;indiquez pas de numéro de téléphone ici — utilisez la messagerie pour échanger avec les clients.
+        </p>
       </div>
 
       <div>
@@ -169,13 +202,17 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
             Prix / nuit (FCFA)
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             required
-            min="0"
-            value={prixNuit}
-            onChange={(e) => setPrixNuit(e.target.value)}
+            value={prixAffiche}
+            onChange={handlePrixChange}
+            placeholder="Ex : 25.000"
             className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
           />
+          <p className="text-xs text-anthracite-400 mt-1">
+            Avec ou sans point, ex : 25000 ou 25.000
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-anthracite-600 mb-1">
@@ -191,6 +228,27 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
           />
         </div>
       </div>
+
+      {residence && (
+        <div className="bg-anthracite-50 rounded-md p-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={disponible}
+              onChange={(e) => setDisponible(e.target.checked)}
+              className="w-5 h-5"
+            />
+            <div>
+              <p className="text-sm font-medium text-anthracite-800">
+                Résidence disponible à la réservation
+              </p>
+              <p className="text-xs text-anthracite-400">
+                Décochez si la résidence est actuellement occupée ou indisponible. Réactivez-la vous-même une fois qu&apos;elle est libre.
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-anthracite-600 mb-1">
@@ -244,7 +302,7 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
         />
       </div>
 
-      {erreur && <p className="text-rouge-500 text-sm">{erreur}</p>}
+      {erreur && <p className="text-rouge-500 text-sm bg-rouge-50 rounded-md p-3">{erreur}</p>}
 
       <div className="flex gap-3 pt-2">
         <button
