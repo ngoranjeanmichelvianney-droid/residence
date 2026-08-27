@@ -33,6 +33,9 @@ export default function AdminLayout({ children }) {
             <Link href="/admin/residences" className="hover:text-jaune-300 transition">
               Résidences
             </Link>
+            <Link href="/admin/support" className="hover:text-jaune-300 transition">
+              Gestion
+            </Link>
             <button
               onClick={handleDeconnexion}
               className="text-jaune-300 hover:text-white transition"
@@ -88,6 +91,13 @@ export default function AdminLayout({ children }) {
               className="py-3 border-b border-bleu-500/50 hover:text-jaune-300 transition"
             >
               Résidences
+            </Link>
+            <Link
+              href="/admin/support"
+              onClick={() => setMenuOuvert(false)}
+              className="py-3 border-b border-bleu-500/50 hover:text-jaune-300 transition"
+            >
+              Gestion
             </Link>
             <button
               onClick={handleDeconnexion}

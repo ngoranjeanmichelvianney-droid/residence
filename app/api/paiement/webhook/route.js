@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { envoyerEmail, emailConfirmationPaiement } from "@/lib/email";
 
@@ -16,11 +17,45 @@ const supabaseAdmin = createClient(
 
 export async function POST(request) {
   try {
-    const payload = await request.json();
+    // --- IMPORTANT : lire le corps en texte brut AVANT de le parser,
+    // la vérification de signature a besoin du JSON exact envoyé par GeniusPay ---
+    const texteBrut = await request.text();
+
+    const signature = request.headers.get("x-webhook-signature");
+    const timestamp = request.headers.get("x-webhook-timestamp");
+
+    const secret = process.env.GENIUSPAY_WEBHOOK_SECRET;
+    const donneesAVerifier = `${timestamp}.${texteBrut}`;
+    const signatureAttendue = crypto
+      .createHmac("sha256", secret)
+      .update(donneesAVerifier)
+      .digest("hex");
+
+    const signatureValide =
+      signature &&
+      signature.length === signatureAttendue.length &&
+      crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(signatureAttendue)
+      );
+
+    if (!signatureValide) {
+      console.error("Webhook GeniusPay : signature invalide, requête rejetée.");
+      return NextResponse.json({ message: "Signature invalide" }, { status: 401 });
+    }
+
+    // Protection anti-rejeu : refuse un webhook de plus de 5 minutes
+    const maintenant = Math.floor(Date.now() / 1000);
+    if (Math.abs(maintenant - Number(timestamp)) > 300) {
+      return NextResponse.json({ message: "Timestamp expiré" }, { status: 400 });
+    }
+
+    const payload = JSON.parse(texteBrut);
 
     const evenement = payload?.event; // ex: "payment.success" | "payment.failed"
     const statut = payload?.data?.status; // ex: "completed" | "failed"
     const reference = payload?.data?.reference;
+    const methodePaiement = payload?.data?.provider || payload?.data?.payment_method;
     const reservationId = payload?.data?.metadata?.reservation_id;
 
     if (!reference && !reservationId) {
@@ -45,6 +80,7 @@ export async function POST(request) {
           paye: true,
           paye_at: new Date().toISOString(),
           statut: "confirmee",
+          methode_paiement: methodePaiement || null,
         })
         .eq("id", reservation.id);
 

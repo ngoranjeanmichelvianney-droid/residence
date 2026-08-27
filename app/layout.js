@@ -1,5 +1,7 @@
 import "./globals.css";
 import Footer from "@/components/Footer";
+import ServiceClientGate from "@/components/ServiceClientGate";
+import { createClient } from "@/lib/supabase/server";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://homtesti.com";
 
@@ -21,12 +23,18 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="fr">
       <body>
         <div className="flex-1">{children}</div>
         <Footer />
+        {user && <ServiceClientGate clientId={user.id} />}
       </body>
     </html>
   );

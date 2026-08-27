@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, MapPin, Users } from "lucide-react";
+import NoteResidence from "./NoterResidence";
 
 export default function ResidenceCard({ residence }) {
   const [index, setIndex] = useState(0);
@@ -101,6 +102,10 @@ export default function ResidenceCard({ residence }) {
           <div className="flex items-center gap-1 text-sm text-anthracite-600 mt-2">
             <Users size={14} className="flex-shrink-0" />
             <span>{residence.capacite} personnes</span>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-anthracite-100">
+            <NoteResidence residenceId={residence.id} />
           </div>
         </div>
       </Link>
