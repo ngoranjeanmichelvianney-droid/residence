@@ -3,6 +3,8 @@ import Header from "@/components/Header";
 import ConfirmerPresence from "@/components/ConfirmerPresence";
 import BoutonPayerReservation from "@/components/BoutonPayerReservation";
 import BoutonRecu from "@/components/BoutonRecu";
+import TerminerSejour from "@/components/TerminerSejour";
+import VerificationAvisEnAttente from "@/components/VerificationAvisEnAttente";
 import Link from "next/link";
 import Image from "next/image";
 import { Phone, FileText } from "lucide-react";
@@ -55,6 +57,12 @@ export default async function MesReservationsPage() {
   return (
     <>
       <Header />
+
+      {/* Filet de sécurité : si le propriétaire a terminé une réservation
+          depuis son dashboard pendant que le client n'était pas là, la modal
+          de notation apparaît ici, à la prochaine visite du client. */}
+      <VerificationAvisEnAttente clientId={client.id} />
+
       <div className="max-w-3xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold text-anthracite-800 mb-8">
           Mes réservations
@@ -156,6 +164,16 @@ export default async function MesReservationsPage() {
                           Détails
                         </Link>
                         <BoutonRecu reservationId={r.id} paye={r.paye} />
+                      </div>
+                    )}
+
+                    {/* Le client peut lui-même signaler la fin de son séjour,
+                        mais seulement après avoir confirmé sa présence — pas
+                        de sens de "libérer" une résidence pas encore occupée.
+                        La modal de notation s'ouvre alors immédiatement. */}
+                    {r.statut === "confirmee" && r.presence_confirmee_at && (
+                      <div className="mt-3 pt-3 border-t border-anthracite-100">
+                        <TerminerSejour reservation={r} clientId={client.id} />
                       </div>
                     )}
                   </div>

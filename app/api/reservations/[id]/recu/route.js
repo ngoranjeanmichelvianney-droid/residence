@@ -40,33 +40,71 @@ export async function GET(request, { params }) {
     );
   }
 
+  // --- Couleurs de la charte HomTesti ---
+  const bleuFonce = rgb(0.118, 0.227, 0.541); // #1e3a8a
+  const jauneAccent = rgb(0.984, 0.749, 0.141); // #fbbf24
+  const grisTexte = rgb(0.38, 0.4, 0.44);
+  const grisClair = rgb(0.96, 0.97, 0.98);
+  const noir = rgb(0.1, 0.11, 0.13);
+  const blanc = rgb(1, 1, 1);
+  const bordure = rgb(0.9, 0.91, 0.93);
+
   // --- Génération du PDF ---
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595, 842]); // A4
-  const policeNormale = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const police = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const policeGrasse = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const bleu = rgb(0.15, 0.35, 0.75);
-  const gris = rgb(0.35, 0.35, 0.35);
-  const noir = rgb(0.1, 0.1, 0.1);
+  const largeurPage = 595;
+  const margeX = 50;
+  const largeurContenu = largeurPage - margeX * 2;
 
-  let y = 780;
+  // --- Bandeau d'en-tête ---
+  const hauteurBandeau = 110;
+  page.drawRectangle({
+    x: 0,
+    y: 842 - hauteurBandeau,
+    width: largeurPage,
+    height: hauteurBandeau,
+    color: bleuFonce,
+  });
 
-  page.drawText("Reçu de paiement", {
-    x: 50,
-    y,
-    size: 24,
+  page.drawText("Hom", {
+    x: margeX,
+    y: 842 - 52,
+    size: 26,
     font: policeGrasse,
-    color: bleu,
+    color: blanc,
+  });
+  const largeurHom = policeGrasse.widthOfTextAtSize("Hom", 26);
+  page.drawText("Testi", {
+    x: margeX + largeurHom,
+    y: 842 - 52,
+    size: 26,
+    font: policeGrasse,
+    color: jauneAccent,
   });
 
-  y -= 40;
-  page.drawLine({
-    start: { x: 50, y },
-    end: { x: 545, y },
-    thickness: 1,
-    color: rgb(0.85, 0.85, 0.85),
+  page.drawText("REÇU DE PAIEMENT", {
+    x: margeX,
+    y: 842 - 78,
+    size: 11,
+    font: policeGrasse,
+    color: rgb(0.85, 0.88, 0.97),
   });
+
+  // Numéro de reçu aligné à droite du bandeau
+  const numeroRecu = `N° ${reservation.id.slice(0, 8).toUpperCase()}`;
+  const largeurNumero = police.widthOfTextAtSize(numeroRecu, 10);
+  page.drawText(numeroRecu, {
+    x: largeurPage - margeX - largeurNumero,
+    y: 842 - 78,
+    size: 10,
+    font: police,
+    color: rgb(0.85, 0.88, 0.97),
+  });
+
+  let y = 842 - hauteurBandeau - 45;
 
   const formaterMontant = (valeur) =>
     `${Number(valeur || 0).toLocaleString("fr-FR")} FCFA`;
@@ -80,66 +118,121 @@ export async function GET(request, { params }) {
         })
       : "—";
 
-  const ligne = (label, valeur, taille = 12) => {
-    y -= 28;
-    page.drawText(label, { x: 50, y, size: taille, font: policeNormale, color: gris });
-    page.drawText(String(valeur), {
-      x: 250,
+  // --- Bloc d'informations avec fond gris clair et lignes zébrées ---
+  function dessinerBloc(titre, lignes) {
+    page.drawText(titre.toUpperCase(), {
+      x: margeX,
       y,
-      size: taille,
+      size: 10,
       font: policeGrasse,
-      color: noir,
+      color: bleuFonce,
     });
-  };
+    y -= 18;
 
-  y -= 20;
-  ligne("Référence de transaction", reservation.reference_paiement || "—");
-  ligne("Méthode de paiement", reservation.methode_paiement || "—");
-  ligne("Date de paiement", formaterDate(reservation.paye_at));
+    const hauteurLigne = 26;
+    const hauteurBloc = lignes.length * hauteurLigne;
 
-  y -= 20;
-  page.drawLine({
-    start: { x: 50, y },
-    end: { x: 545, y },
-    thickness: 1,
-    color: rgb(0.85, 0.85, 0.85),
+    page.drawRectangle({
+      x: margeX,
+      y: y - hauteurBloc + hauteurLigne - 8,
+      width: largeurContenu,
+      height: hauteurBloc,
+      color: grisClair,
+      borderColor: bordure,
+      borderWidth: 1,
+    });
+
+    lignes.forEach(([label, valeur], index) => {
+      const yLigne = y - index * hauteurLigne;
+      page.drawText(label, {
+        x: margeX + 16,
+        y: yLigne - 10,
+        size: 10.5,
+        font: police,
+        color: grisTexte,
+      });
+      const texteValeur = String(valeur);
+      const largeurValeur = policeGrasse.widthOfTextAtSize(texteValeur, 10.5);
+      page.drawText(texteValeur, {
+        x: margeX + largeurContenu - 16 - largeurValeur,
+        y: yLigne - 10,
+        size: 10.5,
+        font: policeGrasse,
+        color: noir,
+      });
+
+      if (index < lignes.length - 1) {
+        page.drawLine({
+          start: { x: margeX + 16, y: yLigne - hauteurLigne + 8 },
+          end: { x: margeX + largeurContenu - 16, y: yLigne - hauteurLigne + 8 },
+          thickness: 0.5,
+          color: bordure,
+        });
+      }
+    });
+
+    y -= hauteurBloc + 30;
+  }
+
+  dessinerBloc("Détails du paiement", [
+    ["Référence de transaction", reservation.reference_paiement || "—"],
+    ["Méthode de paiement", reservation.methode_paiement || "—"],
+    ["Date de paiement", formaterDate(reservation.paye_at)],
+  ]);
+
+  dessinerBloc("Résidence réservée", [
+    ["Résidence", reservation.residences?.titre || "—"],
+    ["Adresse", reservation.residences?.adresse || "—"],
+    ["Date d'arrivée", formaterDate(reservation.date_arrivee)],
+    ["Date de départ", formaterDate(reservation.date_depart)],
+  ]);
+
+  // --- Bloc montant total, mis en avant ---
+  const hauteurMontant = 60;
+  page.drawRectangle({
+    x: margeX,
+    y: y - hauteurMontant + 30,
+    width: largeurContenu,
+    height: hauteurMontant,
+    color: bleuFonce,
   });
-
-  ligne("Résidence", reservation.residences?.titre || "—");
-  ligne("Adresse", reservation.residences?.adresse || "—");
-  ligne("Date d'arrivée", formaterDate(reservation.date_arrivee));
-  ligne("Date de départ", formaterDate(reservation.date_depart));
-
-  y -= 20;
-  page.drawLine({
-    start: { x: 50, y },
-    end: { x: 545, y },
-    thickness: 1,
-    color: rgb(0.85, 0.85, 0.85),
-  });
-
-  y -= 40;
-  page.drawText("Montant payé", {
-    x: 50,
-    y,
-    size: 16,
+  page.drawText("MONTANT TOTAL PAYÉ", {
+    x: margeX + 20,
+    y: y + 4,
+    size: 10,
     font: policeGrasse,
-    color: noir,
+    color: rgb(0.85, 0.88, 0.97),
   });
-  page.drawText(formaterMontant(reservation.montant), {
-    x: 250,
-    y,
-    size: 16,
+  const texteMontant = formaterMontant(reservation.montant);
+  const largeurMontant = policeGrasse.widthOfTextAtSize(texteMontant, 20);
+  page.drawText(texteMontant, {
+    x: margeX + largeurContenu - 20 - largeurMontant,
+    y: y - 2,
+    size: 20,
     font: policeGrasse,
-    color: bleu,
+    color: jauneAccent,
   });
 
+  // --- Pied de page ---
+  page.drawLine({
+    start: { x: margeX, y: 70 },
+    end: { x: largeurPage - margeX, y: 70 },
+    thickness: 0.5,
+    color: bordure,
+  });
   page.drawText("Ce document fait office de reçu de paiement.", {
-    x: 50,
-    y: 60,
+    x: margeX,
+    y: 52,
     size: 9,
-    font: policeNormale,
-    color: gris,
+    font: police,
+    color: grisTexte,
+  });
+  page.drawText("HomTesti — Abidjan, Côte d'Ivoire", {
+    x: margeX,
+    y: 38,
+    size: 9,
+    font: police,
+    color: grisTexte,
   });
 
   const pdfBytes = await pdfDoc.save();

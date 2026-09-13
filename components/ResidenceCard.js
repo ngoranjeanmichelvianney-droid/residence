@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, MapPin, Users } from "lucide-react";
-import NoteResidence from "./NoterResidence";
+import NoteResidence from "./NoteResidence";
 
 export default function ResidenceCard({ residence }) {
   const [index, setIndex] = useState(0);
@@ -20,7 +20,7 @@ export default function ResidenceCard({ residence }) {
   function next(e) {
     e.preventDefault();
     e.stopPropagation();
-    setIndex((i) => (i === images.length - 1 ? 0 : i + 1));
+    setIndex((i) => (i === images.length - 1 ? 0 : i - 1));
   }
 
   return (
@@ -88,9 +88,13 @@ export default function ResidenceCard({ residence }) {
             {residence.titre}
           </h3>
 
-          <div className="flex items-center gap-1 text-sm text-anthracite-400 mt-1">
-            <MapPin size={14} className="flex-shrink-0" />
-            <span className="truncate">{residence.adresse}</span>
+          <div className="flex items-center gap-1.5 text-sm text-anthracite-400 mt-1">
+            <div className="flex items-center gap-1 min-w-0">
+              <MapPin size={14} className="flex-shrink-0" />
+              <span className="truncate">{residence.adresse}</span>
+            </div>
+            <span className="text-anthracite-300">·</span>
+            <NoteResidence residenceId={residence.id} />
           </div>
 
           {residence.description && (
@@ -102,10 +106,6 @@ export default function ResidenceCard({ residence }) {
           <div className="flex items-center gap-1 text-sm text-anthracite-600 mt-2">
             <Users size={14} className="flex-shrink-0" />
             <span>{residence.capacite} personnes</span>
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-anthracite-100">
-            <NoteResidence residenceId={residence.id} />
           </div>
         </div>
       </Link>

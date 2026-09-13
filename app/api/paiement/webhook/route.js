@@ -17,8 +17,6 @@ const supabaseAdmin = createClient(
 
 export async function POST(request) {
   try {
-    // --- IMPORTANT : lire le corps en texte brut AVANT de le parser,
-    // la vérification de signature a besoin du JSON exact envoyé par GeniusPay ---
     const texteBrut = await request.text();
 
     const signature = request.headers.get("x-webhook-signature");
@@ -44,7 +42,6 @@ export async function POST(request) {
       return NextResponse.json({ message: "Signature invalide" }, { status: 401 });
     }
 
-    // Protection anti-rejeu : refuse un webhook de plus de 5 minutes
     const maintenant = Math.floor(Date.now() / 1000);
     if (Math.abs(maintenant - Number(timestamp)) > 300) {
       return NextResponse.json({ message: "Timestamp expiré" }, { status: 400 });
@@ -52,8 +49,8 @@ export async function POST(request) {
 
     const payload = JSON.parse(texteBrut);
 
-    const evenement = payload?.event; // ex: "payment.success" | "payment.failed"
-    const statut = payload?.data?.status; // ex: "completed" | "failed"
+    const evenement = payload?.event;
+    const statut = payload?.data?.status;
     const reference = payload?.data?.reference;
     const methodePaiement = payload?.data?.provider || payload?.data?.payment_method;
     const reservationId = payload?.data?.metadata?.reservation_id;
@@ -89,7 +86,6 @@ export async function POST(request) {
         .update({ disponible: false })
         .eq("id", reservation.residence_id);
 
-      // Envoie l'email de confirmation si le client a renseigné une adresse
       const { data: details } = await supabaseAdmin
         .from("reservations")
         .select("*, residences(id, titre), clients(nom, email)")
@@ -99,9 +95,6 @@ export async function POST(request) {
       const emailClient = details?.clients?.email;
 
       if (emailClient) {
-        // Cherche la conversation existante (créée seulement une fois
-        // que le client clique "Contacter le propriétaire"), sinon le
-        // lien pointera simplement vers la page de la résidence.
         const { data: conversation } = await supabaseAdmin
           .from("conversations")
           .select("id")
@@ -119,11 +112,25 @@ export async function POST(request) {
           dateArrivee: new Date(details.date_arrivee).toLocaleDateString("fr-FR"),
           dateDepart: new Date(details.date_depart).toLocaleDateString("fr-FR"),
           montant: details.montant,
+          methodePaiement: methodePaiement || details.methode_paiement || null,
           lienConversation,
         });
 
-        envoyerEmail({ destinataire: emailClient, sujet, html }).catch((err) =>
-          console.error("Erreur envoi email confirmation paiement :", err)
+        // 👇 correctif : on attend l'envoi avant que la fonction ne se termine,
+        // sinon l'environnement serverless peut couper le fetch en plein vol.
+        try {
+          const resultat = await envoyerEmail({ destinataire: emailClient, sujet, html });
+          if (resultat?.erreur) {
+            console.error("Email de confirmation paiement non envoyé :", resultat.erreur);
+          }
+        } catch (err) {
+          console.error("Erreur envoi email confirmation paiement :", err);
+        }
+      } else {
+        // 👇 ajout : pour repérer si le problème vient plutôt d'un email client manquant
+        console.warn(
+          "Email de paiement non envoyé : aucun email client trouvé pour la réservation",
+          reservation.id
         );
       }
     } else if (evenement === "payment.failed") {
