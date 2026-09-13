@@ -13,3 +13,49 @@ body {
   flex-direction: column;
   min-height: 100vh;
 }
+
+@keyframes introLogoZoom {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes introShine {
+  0% {
+    transform: translateX(-150%) rotate(20deg);
+  }
+  100% {
+    transform: translateX(150%) rotate(20deg);
+  }
+}
+
+@keyframes introFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+.intro-logo {
+  animation: introLogoZoom 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.intro-shine {
+  animation: introShine 1.3s ease-in-out 0.4s forwards;
+}
+
+.intro-overlay-sortie {
+  animation: introFadeOut 0.6s ease forwards;
+}

@@ -5,10 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Header from "@/components/Header";
+import { Eye, EyeOff } from "lucide-react";
 
-// Supabase Auth a besoin d'un identifiant unique de type email.
-// Le propriétaire ne saisit qu'un numéro de téléphone ; on génère un email
-// technique en interne, jamais montré ni utilisé pour le contacter.
 function telephoneVersEmailTechnique(telephone) {
   const nettoye = telephone.replace(/[^0-9]/g, "");
   return `${nettoye}@homtesti.local`;
@@ -17,8 +15,11 @@ function telephoneVersEmailTechnique(telephone) {
 export default function RegisterPage() {
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
-  const [email, setEmail] = useState("");
+  const [emailContact, setEmailContact] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmationPassword, setConfirmationPassword] = useState("");
+  const [afficherPassword, setAfficherPassword] = useState(false);
+  const [afficherConfirmation, setAfficherConfirmation] = useState(false);
   const [pieceRecto, setPieceRecto] = useState(null);
   const [pieceVerso, setPieceVerso] = useState(null);
   const [cguAcceptees, setCguAcceptees] = useState(false);
@@ -32,17 +33,14 @@ export default function RegisterPage() {
   const typeProprietaire = searchParams.get("type") === "proprietaire";
   const redirect = searchParams.get("redirect") || "/";
 
-  function envoyerEmailBienvenue(nomPersonne, typeCompte) {
-    fetch("/api/notifications/bienvenue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, nom: nomPersonne, typeCompte }),
-    }).catch((err) => console.error("Erreur envoi email bienvenue :", err));
-  }
-
   async function handleRegister(e) {
     e.preventDefault();
     setErreur("");
+
+    if (password !== confirmationPassword) {
+      setErreur("Les mots de passe ne correspondent pas.");
+      return;
+    }
 
     if (!cguAcceptees) {
       setErreur("Vous devez accepter les conditions générales pour continuer.");
@@ -55,7 +53,6 @@ export default function RegisterPage() {
     const supabase = createClient();
     const emailTechnique = telephoneVersEmailTechnique(telephone);
 
-    // 1. Créer le compte auth (identifiant = numéro de téléphone en interne)
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: emailTechnique,
       password,
@@ -72,8 +69,8 @@ export default function RegisterPage() {
     }
 
     const maintenant = new Date().toISOString();
+    const emailAEnvoyer = emailContact.trim();
 
-    // 2. Si inscription propriétaire, uploader recto/verso puis créer le profil
     if (typeProprietaire) {
       const extRecto = pieceRecto.name.split(".").pop();
       const extVerso = pieceVerso.name.split(".").pop();
@@ -104,15 +101,13 @@ export default function RegisterPage() {
 
       setEtapeChargement("Finalisation...");
 
-      // Le profil est créé tout de suite, sans attendre le résultat de l'OCR
-      // (piece_identite_ocr_valide reste "null" = vérification en cours).
       const { data: proprietaireCree, error: profilError } = await supabase
         .from("proprietaires")
         .insert({
           auth_id: authData.user.id,
           nom,
           telephone,
-          email,
+          email: emailAEnvoyer,
           piece_identite_recto_path: cheminRecto,
           piece_identite_verso_path: cheminVerso,
           piece_identite_ocr_valide: null,
@@ -127,9 +122,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // On lance la vérification OCR en arrière-plan, SANS attendre sa
-      // réponse : elle mettra à jour la base elle-même une fois terminée.
-      // L'inscription du propriétaire n'est donc plus ralentie par l'OCR.
       supabase.storage
         .from("pieces-identite")
         .createSignedUrl(cheminRecto, 60 * 10)
@@ -142,25 +134,26 @@ export default function RegisterPage() {
                 imageUrl: signedUrlData.signedUrl,
                 proprietaireId: proprietaireCree.id,
               }),
-            }).catch((err) =>
-              console.error("Erreur envoi vérification OCR (arrière-plan) :", err)
-            );
+            }).catch((err) => console.error("Erreur OCR arrière-plan :", err));
           }
         });
 
-      envoyerEmailBienvenue(nom, "proprietaire");
+      fetch("/api/notifications/bienvenue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailAEnvoyer, nom, typeCompte: "proprietaire" }),
+      }).catch((err) => console.error("Erreur email bienvenue :", err));
 
       setChargement(false);
       setSucces(true);
       return;
     }
 
-    // 3. Inscription client : créer le profil dans la table clients
     const { error: clientError } = await supabase.from("clients").insert({
       auth_id: authData.user.id,
       nom,
       telephone,
-      email,
+      email: emailAEnvoyer,
       cgu_accepted_at: maintenant,
     });
 
@@ -171,7 +164,11 @@ export default function RegisterPage() {
       return;
     }
 
-    envoyerEmailBienvenue(nom, "client");
+    fetch("/api/notifications/bienvenue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailAEnvoyer, nom, typeCompte: "client" }),
+    }).catch((err) => console.error("Erreur email bienvenue :", err));
 
     router.push(redirect);
     router.refresh();
@@ -248,14 +245,13 @@ export default function RegisterPage() {
             <input
               type="email"
               required
-              placeholder="vous@exemple.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="votre@gmail.com"
+              value={emailContact}
+              onChange={(e) => setEmailContact(e.target.value)}
               className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
             />
             <p className="text-xs text-anthracite-400 mt-1">
-              Utilisé pour vos confirmations et pour réinitialiser votre mot de
-              passe si besoin.
+              Pour recevoir vos confirmations et reçus par email.
             </p>
           </div>
 
@@ -296,14 +292,48 @@ export default function RegisterPage() {
             <label className="block text-sm font-medium text-anthracite-600 mb-1">
               Mot de passe
             </label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
-            />
+            <div className="relative">
+              <input
+                type={afficherPassword ? "text" : "password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-anthracite-100 rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-bleu-500"
+              />
+              <button
+                type="button"
+                onClick={() => setAfficherPassword(!afficherPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-anthracite-400 hover:text-anthracite-600"
+                tabIndex={-1}
+              >
+                {afficherPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-anthracite-600 mb-1">
+              Confirmer le mot de passe
+            </label>
+            <div className="relative">
+              <input
+                type={afficherConfirmation ? "text" : "password"}
+                required
+                minLength={6}
+                value={confirmationPassword}
+                onChange={(e) => setConfirmationPassword(e.target.value)}
+                className="w-full border border-anthracite-100 rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-bleu-500"
+              />
+              <button
+                type="button"
+                onClick={() => setAfficherConfirmation(!afficherConfirmation)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-anthracite-400 hover:text-anthracite-600"
+                tabIndex={-1}
+              >
+                {afficherConfirmation ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <label className="flex items-start gap-2 text-sm text-anthracite-600">
@@ -333,6 +363,16 @@ export default function RegisterPage() {
             {chargement ? etapeChargement || "Inscription..." : "S'inscrire"}
           </button>
         </form>
+
+        <p className="text-sm text-anthracite-400 mt-6 text-center">
+          Déjà un compte ?{" "}
+          <a
+            href={`/auth/login?redirect=${encodeURIComponent(redirect)}`}
+            className="text-bleu-600 font-medium hover:underline"
+          >
+            Connectez-vous
+          </a>
+        </p>
       </div>
     </>
   );

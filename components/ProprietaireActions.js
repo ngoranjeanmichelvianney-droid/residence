@@ -12,9 +12,14 @@ export default function ProprietaireActions({ id, nom, email }) {
   async function changerStatut(statut) {
     setErreur("");
 
+    const updates = { statut };
+    if (statut === "actif") {
+      updates.validation_vue = false;
+    }
+
     const { error } = await supabase
       .from("proprietaires")
-      .update({ statut })
+      .update(updates)
       .eq("id", id);
 
     if (error) {

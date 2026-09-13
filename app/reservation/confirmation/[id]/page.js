@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
+import BoutonRecu from "@/components/BoutonRecu";
+import EnvoyerRecuEmail from "@/components/EnvoyerRecuEmail";
 import Link from "next/link";
 import { CheckCircle2, Clock, MapPin, MessageCircle } from "lucide-react";
 
@@ -28,9 +30,6 @@ export default async function ConfirmationPage({ params, searchParams }) {
     );
   }
 
-  // GeniusPay ajoute directement le statut du paiement en paramètres de son
-  // URL de retour (ex: ?reference=...&status=completed) : on s'en sert en
-  // priorité, c'est plus fiable et immédiat qu'un appel API supplémentaire.
   const statutRetour = searchParams?.status;
   const referenceRetour = searchParams?.reference;
 
@@ -38,9 +37,6 @@ export default async function ConfirmationPage({ params, searchParams }) {
     statutRetour === "completed" || statutRetour === "success";
 
   if (!reservation.paye && paiementConfirmeParRetour) {
-    // Sécurité minimale : la référence renvoyée doit correspondre à celle
-    // enregistrée pour cette réservation (évite qu'un lien trafiqué confirme
-    // n'importe quelle réservation).
     const referenceValide =
       !reservation.reference_paiement || reservation.reference_paiement === referenceRetour;
 
@@ -131,14 +127,27 @@ export default async function ConfirmationPage({ params, searchParams }) {
           </div>
 
           {reservation.paye && (
-            <div className="border-t border-anthracite-100 pt-3">
-              <p className="text-xs text-anthracite-500 mb-2">
-                Pour toute question ou précision sur votre arrivée, contactez
-                {proprietaireNom ? ` ${proprietaireNom}` : " le propriétaire"} directement
-                via la messagerie HomTesti.
-              </p>
-              <ContacterProprietaireBouton residenceId={residence?.id} />
-            </div>
+            <>
+              <div className="border-t border-anthracite-100 pt-3">
+                <p className="text-xs text-anthracite-500 mb-2">
+                  Pour toute question ou précision sur votre arrivée, contactez
+                  {proprietaireNom ? ` ${proprietaireNom}` : " le propriétaire"} directement
+                  via la messagerie HomTesti.
+                </p>
+                <ContacterProprietaireBouton residenceId={residence?.id} />
+              </div>
+
+              <div className="border-t border-anthracite-100 pt-3">
+                <BoutonRecu reservationId={reservation.id} paye={reservation.paye} />
+              </div>
+
+              <div className="border-t border-anthracite-100 pt-3">
+                <p className="text-xs text-anthracite-500 mb-2">
+                  Recevoir le reçu par email
+                </p>
+                <EnvoyerRecuEmail reservationId={reservation.id} />
+              </div>
+            </>
           )}
         </div>
 
@@ -153,7 +162,6 @@ export default async function ConfirmationPage({ params, searchParams }) {
   );
 }
 
-// Composant client minimal, uniquement pour le bouton (créer/ouvrir la conversation)
 function ContacterProprietaireBouton({ residenceId }) {
   return (
     <a

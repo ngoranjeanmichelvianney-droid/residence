@@ -78,12 +78,20 @@ export default async function DashboardProprietaire() {
           </h1>
           <p className="text-anthracite-400 text-sm">Votre espace propriétaire</p>
         </div>
-        <Link
-          href="/proprietaire/residences/nouvelle"
-          className="bg-rouge-500 hover:bg-rouge-600 text-white font-semibold px-5 py-2.5 rounded-md transition"
-        >
-          + Ajouter une résidence
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/proprietaire/messages"
+            className="bg-white border border-anthracite-200 hover:border-anthracite-400 text-anthracite-800 font-semibold px-5 py-2.5 rounded-md transition"
+          >
+            Messages
+          </Link>
+          <Link
+            href="/proprietaire/residences/nouvelle"
+            className="bg-rouge-500 hover:bg-rouge-600 text-white font-semibold px-5 py-2.5 rounded-md transition"
+          >
+            + Ajouter une résidence
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
@@ -140,6 +148,12 @@ export default async function DashboardProprietaire() {
                     ? "En attente"
                     : "Brouillon"}
                 </span>
+                <Link
+                  href={`/proprietaire/residences/${r.id}`}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-md border border-bleu-600 text-bleu-600 hover:bg-bleu-50 transition"
+                >
+                  Modifier
+                </Link>
                 <ResidenceDeleteAction id={r.id} titre={r.titre} />
               </div>
             </div>

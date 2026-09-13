@@ -15,8 +15,8 @@ const CATEGORIES = [
   { valeur: "autre", label: "Autre" },
 ];
 
-const CATEGORIES_OBLIGATOIRES = ["cuisine", "salle_de_bain"];
-const NOMBRE_PHOTOS_MIN = 10;
+const NOMBRE_PHOTOS_MIN = 3;
+const NOMBRE_PHOTOS_MAX = 10;
 
 function formaterPrixAffichage(valeurBrute) {
   const chiffres = valeurBrute.replace(/[^0-9]/g, "");
@@ -46,8 +46,6 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
     residence?.disponible !== undefined ? residence.disponible : true
   );
 
-  // Chaque image existante garde son URL + sa catégorie (si déjà connue),
-  // sinon "autre" par défaut pour les résidences créées avant ce système.
   const [imagesExistantes, setImagesExistantes] = useState(
     (residence?.images || []).map((url, i) => ({
       url,
@@ -55,7 +53,6 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
     }))
   );
   const [nouveauxFichiers, setNouveauxFichiers] = useState([]);
-  const [videoUrl, setVideoUrl] = useState(residence?.video_url || "");
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -64,11 +61,31 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
   }
 
   function handleFichiers(e) {
-    const fichiers = Array.from(e.target.files).map((fichier) => ({
+    const fichiersChoisis = Array.from(e.target.files);
+    const placesRestantes =
+      NOMBRE_PHOTOS_MAX - imagesExistantes.length - nouveauxFichiers.length;
+
+    if (placesRestantes <= 0) {
+      setErreur(`Vous avez déjà atteint le maximum de ${NOMBRE_PHOTOS_MAX} photos.`);
+      e.target.value = "";
+      return;
+    }
+
+    const fichiersRetenus = fichiersChoisis.slice(0, placesRestantes);
+    if (fichiersChoisis.length > placesRestantes) {
+      setErreur(
+        `Seulement ${placesRestantes} photo(s) ajoutée(s) : le maximum est de ${NOMBRE_PHOTOS_MAX} photos.`
+      );
+    } else {
+      setErreur("");
+    }
+
+    const fichiers = fichiersRetenus.map((fichier) => ({
       fichier,
       categorie: "autre",
     }));
-    setNouveauxFichiers(fichiers);
+    setNouveauxFichiers((prev) => [...prev, ...fichiers]);
+    e.target.value = "";
   }
 
   function changerCategorieExistante(index, categorie) {
@@ -112,22 +129,6 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
     const totalPhotos = imagesExistantes.length + nouveauxFichiers.length;
     if (totalPhotos < NOMBRE_PHOTOS_MIN) {
       return `Il faut au moins ${NOMBRE_PHOTOS_MIN} photos pour publier (actuellement ${totalPhotos}).`;
-    }
-
-    const categoriesPresentes = new Set([
-      ...imagesExistantes.map((img) => img.categorie),
-      ...nouveauxFichiers.map((f) => f.categorie),
-    ]);
-
-    const manquantes = CATEGORIES_OBLIGATOIRES.filter(
-      (cat) => !categoriesPresentes.has(cat)
-    );
-
-    if (manquantes.length > 0) {
-      const labels = manquantes
-        .map((cat) => CATEGORIES.find((c) => c.valeur === cat)?.label)
-        .join(", ");
-      return `Il faut au moins une photo pour chacune de ces pièces : ${labels}.`;
     }
 
     return null;
@@ -188,7 +189,6 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
         disponible,
         images: toutesLesImages.map((img) => img.url),
         images_categories: toutesLesImages.map((img) => img.categorie),
-        video_url: videoUrl || null,
         statut: statutFinal,
       };
 
@@ -213,6 +213,7 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
   }
 
   const totalPhotos = imagesExistantes.length + nouveauxFichiers.length;
+  const maxAtteint = totalPhotos >= NOMBRE_PHOTOS_MAX;
 
   return (
     <form className="space-y-5">
@@ -327,30 +328,9 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
       )}
 
       <div>
-        <label className="block text-sm font-medium text-anthracite-600 mb-1">
-          Lien vidéo (optionnel — YouTube, etc.)
+        <label className="block text-sm font-medium text-anthracite-600 mb-2">
+          Photos
         </label>
-        <input
-          type="url"
-          value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="https://..."
-          className="w-full border border-anthracite-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-bleu-500"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-anthracite-600">
-            Photos ({totalPhotos} / {NOMBRE_PHOTOS_MIN} minimum pour publier)
-          </label>
-        </div>
-
-        <p className="text-xs text-anthracite-400 mb-3">
-          Pour publier, il faut au moins {NOMBRE_PHOTOS_MIN} photos, dont au
-          moins une de la cuisine et une de la salle de bain / douche. Merci
-          de ne pas laisser de numéro de téléphone visible sur les photos.
-        </p>
 
         {imagesExistantes.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
@@ -424,8 +404,9 @@ export default function ResidenceForm({ proprietaireId, residence = null }) {
           type="file"
           accept="image/*"
           multiple
+          disabled={maxAtteint}
           onChange={handleFichiers}
-          className="w-full text-sm text-anthracite-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-bleu-50 file:text-bleu-600 file:font-medium"
+          className="w-full text-sm text-anthracite-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-bleu-50 file:text-bleu-600 file:font-medium disabled:opacity-50"
         />
       </div>
 

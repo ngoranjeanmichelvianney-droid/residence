@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import ResidenceCard from "@/components/ResidenceCard";
 import SearchBar from "@/components/SearchBar";
+import IntroSplash from "@/components/IntroSplash";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
@@ -15,6 +16,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <IntroSplash />
       <Header />
 
       <section className="bg-bleu-600 text-white">
