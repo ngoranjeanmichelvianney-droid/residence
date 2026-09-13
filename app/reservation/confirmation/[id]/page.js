@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import BoutonRecu from "@/components/BoutonRecu";
-import EnvoyerRecuEmail from "@/components/EnvoyerRecuEmail";
 import Link from "next/link";
 import { CheckCircle2, Clock, MapPin, MessageCircle } from "lucide-react";
+import { envoyerEmail, emailConfirmationPaiement } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
   let { data: reservation } = await supabase
     .from("reservations")
-    .select("*, residences(id, titre, adresse, proprietaires(nom))")
+    .select("*, residences(id, titre, adresse, proprietaires(nom)), clients(nom, email)")
     .eq("id", params.id)
     .single();
 
@@ -36,6 +36,10 @@ export default async function ConfirmationPage({ params, searchParams }) {
   const paiementConfirmeParRetour =
     statutRetour === "completed" || statutRetour === "success";
 
+  // Filet de sécurité : si le webhook GeniusPay n'est pas encore arrivé quand
+  // le client revient sur cette page après paiement, on marque la réservation
+  // comme payée ici. On envoie alors le même email de confirmation que le
+  // webhook envoie normalement, pour ne pas laisser le client sans reçu.
   if (!reservation.paye && paiementConfirmeParRetour) {
     const referenceValide =
       !reservation.reference_paiement || reservation.reference_paiement === referenceRetour;
@@ -57,11 +61,39 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
       const { data: reservationMaj } = await supabase
         .from("reservations")
-        .select("*, residences(id, titre, adresse, proprietaires(nom))")
+        .select("*, residences(id, titre, adresse, proprietaires(nom)), clients(nom, email)")
         .eq("id", reservation.id)
         .single();
 
       reservation = reservationMaj;
+
+      const emailClient = reservation?.clients?.email;
+
+      if (emailClient) {
+        const { data: conversation } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("residence_id", reservation.residence_id)
+          .eq("client_id", reservation.client_id)
+          .maybeSingle();
+
+        const lienConversation = conversation
+          ? `${process.env.NEXT_PUBLIC_SITE_URL}/mes-messages/${conversation.id}`
+          : `${process.env.NEXT_PUBLIC_SITE_URL}/api/messages/conversation/creer-et-rediriger?residenceId=${reservation.residence_id}`;
+
+        const { sujet, html } = emailConfirmationPaiement({
+          nomClient: reservation.clients.nom,
+          titreResidence: reservation.residences?.titre || "votre résidence",
+          dateArrivee: new Date(reservation.date_arrivee).toLocaleDateString("fr-FR"),
+          dateDepart: new Date(reservation.date_depart).toLocaleDateString("fr-FR"),
+          montant: reservation.montant,
+          lienConversation,
+        });
+
+        envoyerEmail({ destinataire: emailClient, sujet, html }).catch((err) =>
+          console.error("Erreur envoi email confirmation paiement (fallback page) :", err)
+        );
+      }
     }
   }
 
@@ -139,13 +171,6 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
               <div className="border-t border-anthracite-100 pt-3">
                 <BoutonRecu reservationId={reservation.id} paye={reservation.paye} />
-              </div>
-
-              <div className="border-t border-anthracite-100 pt-3">
-                <p className="text-xs text-anthracite-500 mb-2">
-                  Recevoir le reçu par email
-                </p>
-                <EnvoyerRecuEmail reservationId={reservation.id} />
               </div>
             </>
           )}

@@ -43,7 +43,7 @@ export default function Footer() {
         <div>
           <h3 className="font-semibold mb-3 text-jaune-300">Contact</h3>
           <ul className="space-y-2 text-sm text-bleu-100">
-            <li>+225 XX XX XX XX XX</li>
+            <li>+225 0596068387</li>
             <li>contact@homtesti.com</li>
             <li>Abidjan, Côte d&apos;Ivoire</li>
           </ul>

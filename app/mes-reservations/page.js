@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import Header from "@/components/Header";
 import ConfirmerPresence from "@/components/ConfirmerPresence";
 import BoutonPayerReservation from "@/components/BoutonPayerReservation";
+import BoutonRecu from "@/components/BoutonRecu";
+import Link from "next/link";
 import Image from "next/image";
-import { Phone } from "lucide-react";
+import { Phone, FileText } from "lucide-react";
 
 export default async function MesReservationsPage() {
   const supabase = createClient();
@@ -143,6 +145,19 @@ export default async function MesReservationsPage() {
                         )}
                       </div>
                     )}
+
+                    {r.paye && (
+                      <div className="mt-3 pt-3 border-t border-anthracite-100 flex flex-wrap items-center gap-3">
+                        <Link
+                          href={`/reservation/confirmation/${r.id}`}
+                          className="inline-flex items-center gap-2 border border-anthracite-200 text-anthracite-800 hover:border-anthracite-400 font-medium text-sm px-4 py-2 rounded-md transition"
+                        >
+                          <FileText size={16} />
+                          Détails
+                        </Link>
+                        <BoutonRecu reservationId={r.id} paye={r.paye} />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -158,26 +173,41 @@ export default async function MesReservationsPage() {
             {historique.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center gap-4 bg-white border border-anthracite-100 rounded-lg p-4"
+                className="bg-white border border-anthracite-100 rounded-lg p-4"
               >
-                <div className="relative w-20 h-16 bg-anthracite-100 rounded-md overflow-hidden flex-shrink-0">
-                  {r.residences?.images?.[0] && (
-                    <Image
-                      src={r.residences.images[0]}
-                      alt={r.residences.titre}
-                      fill
-                      className="object-cover"
-                    />
-                  )}
+                <div className="flex items-center gap-4">
+                  <div className="relative w-20 h-16 bg-anthracite-100 rounded-md overflow-hidden flex-shrink-0">
+                    {r.residences?.images?.[0] && (
+                      <Image
+                        src={r.residences.images[0]}
+                        alt={r.residences.titre}
+                        fill
+                        className="object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-anthracite-800">
+                      {r.residences?.titre}
+                    </p>
+                    <p className="text-sm text-anthracite-400">
+                      Du {r.date_arrivee} au {r.date_depart}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-anthracite-800">
-                    {r.residences?.titre}
-                  </p>
-                  <p className="text-sm text-anthracite-400">
-                    Du {r.date_arrivee} au {r.date_depart}
-                  </p>
-                </div>
+
+                {r.paye && (
+                  <div className="mt-3 pt-3 border-t border-anthracite-100 flex flex-wrap items-center gap-3">
+                    <Link
+                      href={`/reservation/confirmation/${r.id}`}
+                      className="inline-flex items-center gap-2 border border-anthracite-200 text-anthracite-800 hover:border-anthracite-400 font-medium text-sm px-4 py-2 rounded-md transition"
+                    >
+                      <FileText size={16} />
+                      Détails
+                    </Link>
+                    <BoutonRecu reservationId={r.id} paye={r.paye} />
+                  </div>
+                )}
               </div>
             ))}
           </div>
